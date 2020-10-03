@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"errors"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -61,7 +61,7 @@ func initLanguageChannels() {
 func getOrCreateHandler(schemeIdentifier string, f func(handle *libvarnam.Varnam) (data interface{}, err error)) (data interface{}, err error) {
 	ch, ok := languageChannels[schemeIdentifier]
 	if !ok {
-		return nil, errors.New("invalid scheme identifier")
+		return nil, fmt.Errorf("invalid scheme identifier")
 	}
 
 	select {
@@ -75,13 +75,13 @@ func getOrCreateHandler(schemeIdentifier string, f func(handle *libvarnam.Varnam
 		handle, err = libvarnam.Init(schemeIdentifier)
 		if err != nil {
 			log.Println(err)
-			return nil, errors.New("unable to initialize varnam handle")
+			return nil, fmt.Errorf("unable to initialize varnam handle")
 		}
 
 		data, err = f(handle)
 		if err != nil {
 			log.Println(err)
-			return nil, errors.New("unable to complete varnam handle")
+			return nil, fmt.Errorf("unable to complete varnam handle")
 		}
 
 		go sendHandlerToChannel(schemeIdentifier, handle, ch)

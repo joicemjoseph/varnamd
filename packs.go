@@ -2,11 +2,9 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -41,48 +39,42 @@ func fileExists(filename string) bool {
 
 // Download pack from upstream
 func downloadPackFile(langCode string, packVersionIdentifier string) error {
-	fileURL := fmt.Sprintf("%s/packs/%s/%s", varnamdConfig.upstream, langCode, packVersionIdentifier)
-	filePath := path.Join(getPacksDir(), langCode, "a"+packVersionIdentifier)
+	var (
+		fileURL  = fmt.Sprintf("%s/packs/%s/%s", varnamdConfig.upstream, langCode, packVersionIdentifier)
+		filePath = path.Join(getPacksDir(), langCode, "a"+packVersionIdentifier)
+	)
 
 	resp, err := http.Get(fileURL)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		respData, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		return errors.New(string(respData))
+		return fmt.Errorf("non-200 response (%s)", resp.Status)
 	}
+
+	defer resp.Body.Close()
 
 	out, err := os.Create(filePath)
 	if err != nil {
 		return err
 	}
+
 	defer out.Close()
 
 	// Write the body to file
 	_, err = io.Copy(out, resp.Body)
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func getPackFilePath(langCode string, packVersionIdentifier string) (string, error) {
 	pack, err := getPackInfo(langCode)
-
 	if err != nil {
 		return "", err
 	}
 
-	var packVersion *PackVersion = nil
+	var packVersion *PackVersion
 
 	for _, version := range pack.Versions {
 		if version.Identifier == packVersionIdentifier {
@@ -92,14 +84,14 @@ func getPackFilePath(langCode string, packVersionIdentifier string) (string, err
 	}
 
 	if packVersion == nil {
-		return "", errors.New("Pack version not found")
+		return "", fmt.Errorf("pack version not found")
 	}
 
 	// Example: .varnamd/ml/ml-basic-1
 	packFilePath := path.Join(getPacksDir(), langCode, packVersionIdentifier)
 
 	if !fileExists(packFilePath) {
-		return "", errors.New("Pack file not found")
+		return "", fmt.Errorf("pack file not found")
 	}
 
 	return packFilePath, nil
@@ -107,7 +99,6 @@ func getPackFilePath(langCode string, packVersionIdentifier string) (string, err
 
 func getPackInfo(langCode string) (*Pack, error) {
 	packs, err := getPacksInfo()
-
 	if err != nil {
 		return nil, err
 	}
@@ -118,19 +109,18 @@ func getPackInfo(langCode string) (*Pack, error) {
 		}
 	}
 
-	return nil, errors.New("Pack not found")
+	return nil, fmt.Errorf("pack not found")
 }
 
 func getPacksInfo() ([]Pack, error) {
 	if err := createPacksDir(); err != nil {
-		err := fmt.Errorf("Failed to create packs directory, err: %s", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("failed to create packs directory, err: %s", err.Error())
 	}
 
 	packsFilePath := getPacksDir() + "/packs.json"
 
 	if !fileExists(packsFilePath) {
-		err := errors.New("Packs file doesn't exist")
+		err := fmt.Errorf("packs file doesn't exist")
 		return nil, err
 	}
 
@@ -139,8 +129,7 @@ func getPacksInfo() ([]Pack, error) {
 	var packsInfo []Pack
 
 	if err := json.Unmarshal(packsFile, &packsInfo); err != nil {
-		err := fmt.Errorf("Parsing packs JSON failed, err: %s", err.Error())
-		return nil, err
+		return nil, fmt.Errorf("parsing packs JSON failed, err: %s", err.Error())
 	}
 
 	return packsInfo, nil

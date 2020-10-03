@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -21,7 +20,7 @@ import (
 	"github.com/varnamproject/varnamd/libvarnam"
 )
 
-var errCacheSkipped = errors.New("cache skipped")
+var errCacheSkipped = fmt.Errorf("cache skipped")
 
 // Context which gets passed into the groupcache fill function
 // Data will be set if the cache returns CacheSkipped
@@ -501,6 +500,7 @@ func handleIndex(c echo.Context) error {
 
 	b, err := app.fs.Read("/index.html")
 	if err != nil {
+		app.log.Printf("failed to read index file, err: %s", err.Error())
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
@@ -511,19 +511,23 @@ func handleIndex(c echo.Context) error {
 
 func handlePacks(c echo.Context) error {
 	var (
+		app, _   = c.Get("app").(*App)
 		langCode = c.Param("langCode")
 	)
 
 	if langCode != "" {
 		pack, err := getPackInfo(langCode)
 		if err != nil {
+			app.log.Printf("pack not found for %s, err: %s", langCode, err.Error())
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
+
 		return c.JSON(http.StatusOK, pack)
 	}
 
 	packs, err := getPacksInfo()
 	if err != nil {
+		app.log.Printf("pack not found, err: %s", err.Error())
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
@@ -541,7 +545,6 @@ func handlePacksDownload(c echo.Context) error {
 	}
 
 	packFilePath, err := getPackFilePath(langCode, packVersionIdentifier)
-
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
@@ -553,9 +556,8 @@ func handlePacksDownload(c echo.Context) error {
 // This is an internal function
 func handlePackDownloadRequest(c echo.Context) error {
 	var (
-		args PackDownloadRequestArgs
-		app  = c.Get("app").(*App)
-		err  error
+		app, _ = c.Get("app").(*App)
+		args   PackDownloadRequestArgs
 	)
 
 	if err := c.Bind(&args); err != nil {
@@ -563,8 +565,8 @@ func handlePackDownloadRequest(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("error getting metadata. message: %s", err.Error()))
 	}
 
-	err = downloadPackFile(args.LangCode, args.PackVersionIdentifier)
-	if err != nil {
+	if err := downloadPackFile(args.LangCode, args.PackVersionIdentifier); err != nil {
+		app.log.Printf("failed to download pack file, err: %s", err.Error())
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("error downloading pack: %s", err.Error()))
 	}
 
