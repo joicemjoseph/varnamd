@@ -7,10 +7,10 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [master, gomod-echo, joicemjoseph-patch-1]
+    branches: [joicemjoseph-patch-1]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [master]
+    branches: [joicemjoseph-patch-1]
   schedule:
     - cron: '0 18 * * 3'
 
